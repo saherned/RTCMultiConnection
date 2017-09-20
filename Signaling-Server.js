@@ -92,6 +92,7 @@ module.exports = exports = function(app, socketCallback) {
         }
 
         socket.userid = params.userid;
+        console.log(listOfUsers);
         appendUser(socket);
 
         if (autoCloseEntireSession == 'false' && Object.keys(listOfUsers).length == 1) {
@@ -171,6 +172,26 @@ module.exports = exports = function(app, socketCallback) {
                 callback(allPublicModerators);
             } catch (e) {
                 pushLogs('get-public-moderators', e);
+            }
+        });
+
+        socket.on('get-all-users', function(userIdStartsWith, callback) {
+            try {
+                userIdStartsWith = userIdStartsWith || '';
+                var allUsers = [];
+                for (var userId in listOfUsers) {
+                    if (userId.indexOf(userIdStartsWith) === 0 && userId !== socket.userid) {
+                        var user = listOfUsers[userId];
+                        allUsers.push({
+                            userid: userId,
+                            extra: user.extra
+                        });
+                    }
+                }
+
+                callback(allUsers);
+            } catch (e) {
+                pushLogs('get-all-users', e);
             }
         });
 
@@ -327,8 +348,6 @@ module.exports = exports = function(app, socketCallback) {
                     return;
                 }
                 keepUnique.push(userSocket.userid);
-
-                if (params.oneToMany && userSocket.userid !== roomInitiator.socket.userid) return;
 
                 message.remoteUserId = userSocket.userid;
                 userSocket.emit(socketMessageEvent, message);
