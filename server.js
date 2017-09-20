@@ -11,8 +11,8 @@ function resolveURL(url) {
 // Please use HTTPs on non-localhost domains.
 var isUseHTTPs = true;
 
-var port = 443;
-//var port = process.env.PORT || 9001;
+//var port = 443;
+var port = process.env.PORT || 9001;
 
 var fs = require('fs');
 var path = require('path');
@@ -32,7 +32,7 @@ var autoRebootServerOnFailure = false;
 try {
     var config = require(resolveURL('./config.json'));
 
-    if ((config.port || '').toString() !== '443') {
+    if ((config.port || '').toString() !== '9001') {
         port = parseInt(config.port);
     }
 
