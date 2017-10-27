@@ -69,7 +69,7 @@ module.exports = exports = function(app, socketCallback) {
             maxParticipantsAllowed: params.maxParticipantsAllowed || 1000
         };
 
-        writeLogs('user-added', params.userid);
+        //writeLogs('user-added', params.userid);
         //writeLogs('user-added ' +  params.userid);
         console.log(listOfUsers);
     }
