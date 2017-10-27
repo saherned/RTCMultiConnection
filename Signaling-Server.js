@@ -210,6 +210,7 @@ module.exports = exports = function(app, socketCallback) {
                     var oldUserId = socket.userid;
                     listOfUsers[newUserId] = listOfUsers[oldUserId];
                     listOfUsers[newUserId].socket.userid = socket.userid = newUserId;
+                    writeLogs('user-added', socket.userid + " is connected");
                     delete listOfUsers[oldUserId];
 
                     callback();
@@ -520,6 +521,27 @@ try {
 }
 
 var fs = require('fs');
+var fixedWidthString = require('fixed-width-string');
+var dateFormat = require('dateformat');
+
+function writeLogs() {
+    if (!enableLogs) return;
+    
+    var now = new Date();
+
+    var utcDateString = (new Date).toUTCString().replace(/ |-|,|:|\./g, '');
+    //var fileName = new Date().toISOString().replace(/T.+/, '');
+    var fileName = dateFormat(now, "yyyy-mm-dd");
+
+    var logsFile = process.cwd() + '/debug/' + fileName + '.txt';
+
+    fs.appendFile(logsFile, "[" + dateFormat(now, "HH:MM:ss") + "] - " + fixedWidthString(arguments[0], 18) + arguments[1] + "\n", function(err) {
+        if(err) {
+            return console.log(err);
+        }
+        console.log("The file has been updated!");
+    });
+}
 
 function pushLogs() {
     if (!enableLogs) return;
