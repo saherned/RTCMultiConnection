@@ -521,8 +521,8 @@ try {
 }
 
 var fs = require('fs');
-var fixedWidthString = require('fixed-width-string');
-var dateFormat = require('dateformat');
+//var fixedWidthString = require('fixed-width-string');
+// dateFormat = require('dateformat');
 
 function writeLogs() {
     if (!enableLogs) return;
@@ -535,7 +535,7 @@ function writeLogs() {
 
     var logsFile = process.cwd() + '/debug/' + fileName + '.txt';
 
-    fs.appendFile(logsFile, "[" + dateFormat(now, "HH:MM:ss") + "] - " + fixedWidthString(arguments[0], 18) + arguments[1] + "\n", function(err) {
+    fs.appendFile(logsFile, arguments[1] + "\n", function(err) {
         if(err) {
             return console.log(err);
         }
