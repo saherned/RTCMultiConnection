@@ -6,6 +6,7 @@ module.exports = exports = function(app, socketCallback) {
     // stores all sockets, user-ids, extra-data and connected sockets
     // you can check presence as following:
     // var isRoomExist = listOfUsers['room-id'] != null;
+
     var listOfUsers = {};
 
     var shiftedModerationControls = {};
@@ -39,6 +40,7 @@ module.exports = exports = function(app, socketCallback) {
     // io.set('origins', 'https://domain.com');
 
     function appendUser(socket) {
+
         var alreadyExist = listOfUsers[socket.userid];
         var extra = {};
 
@@ -66,6 +68,10 @@ module.exports = exports = function(app, socketCallback) {
             extra: extra || {},
             maxParticipantsAllowed: params.maxParticipantsAllowed || 1000
         };
+
+        writeLogs('user-added', params.userid);
+        //writeLogs('user-added ' +  params.userid);
+        console.log(listOfUsers);
     }
 
     function onConnection(socket) {
@@ -92,7 +98,6 @@ module.exports = exports = function(app, socketCallback) {
         }
 
         socket.userid = params.userid;
-        console.log(listOfUsers);
         appendUser(socket);
 
         if (autoCloseEntireSession == 'false' && Object.keys(listOfUsers).length == 1) {
@@ -142,6 +147,8 @@ module.exports = exports = function(app, socketCallback) {
             socket.on(customEvent, function(message) {
                 try {
                     socket.broadcast.emit(customEvent, message);
+                    writeLogs(customEvent, message.remoteUserId + " " + customEvent.replace(/-/g, ' ') + " of " + message.receiverId);
+                    //writeLogs(customEvent + " - " + message.remoteUserId + " " + customEvent + " of " + message.receiverId);
                 } catch (e) {}
             });
         });
@@ -211,6 +218,7 @@ module.exports = exports = function(app, socketCallback) {
                     listOfUsers[newUserId] = listOfUsers[oldUserId];
                     listOfUsers[newUserId].socket.userid = socket.userid = newUserId;
                     writeLogs('user-added', socket.userid + " is connected");
+                    //writeLogs('User Added - ' +  socket.userid + " is connected");
                     delete listOfUsers[oldUserId];
 
                     callback();
@@ -241,6 +249,8 @@ module.exports = exports = function(app, socketCallback) {
                 if (listOfUsers[socket.userid] && listOfUsers[socket.userid].connectedWith[remoteUserId]) {
                     delete listOfUsers[socket.userid].connectedWith[remoteUserId];
                     socket.emit('user-disconnected', remoteUserId);
+                    writeLogs('call-ended', socket.userid + " ended call of " + remoteUserId);
+                    //writeLogs('Call Ended - ', socket.userid + " - " + remoteUserId);
                 }
 
                 if (!listOfUsers[remoteUserId]) return callback();
@@ -248,6 +258,8 @@ module.exports = exports = function(app, socketCallback) {
                 if (listOfUsers[remoteUserId].connectedWith[socket.userid]) {
                     delete listOfUsers[remoteUserId].connectedWith[socket.userid];
                     listOfUsers[remoteUserId].socket.emit('user-disconnected', socket.userid);
+                    writeLogs('call-ended', remoteUserId + " received end call of " + socket.userid);
+                    //writeLogs('call-disconnected ' + socket.userid + " - " + remoteUserId);
                 }
                 callback();
             } catch (e) {
@@ -276,8 +288,12 @@ module.exports = exports = function(app, socketCallback) {
         socket.on('check-presence', function(userid, callback) {
             if (!listOfUsers[userid]) {
                 callback(false, userid, {});
+                writeLogs('check-presence', userid + " is available");
+                //writeLogs('Check Presence - ' + userid + " is available");
             } else {
-                callback(userid !== socket.userid, userid, listOfUsers[userid].extra);
+                callback(userid !== socket.userid, userid, listOfUsers[userid].extra)
+                //writeLogs('Check Presence - ' + userid + " is already exist");
+                writeLogs('check-presence', userid + " is already exist");
             }
         });
 
@@ -305,6 +321,7 @@ module.exports = exports = function(app, socketCallback) {
                     listOfUsers[message.remoteUserId].connectedWith[message.sender] = socket;
 
                     if (listOfUsers[message.remoteUserId].socket) {
+                        writeLogs('call-attended', message.sender+ " attended call of " + message.remoteUserId);
                         listOfUsers[message.remoteUserId].socket.emit('user-connected', message.sender);
                     }
                 }
@@ -320,8 +337,12 @@ module.exports = exports = function(app, socketCallback) {
 
         function joinARoom(message) {
             var roomInitiator = listOfUsers[message.remoteUserId];
+            writeLogs('call-request', socket.userid + " is calling " + message.remoteUserId);
+            //writeLogs('Call Request - ' + socket.userid + " is calling " + message.remoteUserId);
 
             if (!roomInitiator) {
+                writeLogs('call-request', message.remoteUserId + " does not exist");
+                //writeLogs('Call Request - ' + message.remoteUserId + " does not exist");
                 return;
             }
 
@@ -329,7 +350,9 @@ module.exports = exports = function(app, socketCallback) {
             var maxParticipantsAllowed = roomInitiator.maxParticipantsAllowed;
 
             if (Object.keys(usersInARoom).length >= maxParticipantsAllowed) {
-                socket.emit('room-full', message.remoteUserId);
+                socket.emit('user-busy', message.remoteUserId  + " is busy");
+                writeLogs('room-full', message.remoteUserId + " is busy");
+                //writeLogs('Room Full - ' + message.remoteUserId + " is busy");
 
                 if (roomInitiator.connectedWith[socket.userid]) {
                     delete roomInitiator.connectedWith[socket.userid];
@@ -350,6 +373,8 @@ module.exports = exports = function(app, socketCallback) {
                 }
                 keepUnique.push(userSocket.userid);
 
+                if (params.oneToMany && userSocket.userid !== roomInitiator.socket.userid) return;
+
                 message.remoteUserId = userSocket.userid;
                 userSocket.emit(socketMessageEvent, message);
             });
@@ -361,6 +386,7 @@ module.exports = exports = function(app, socketCallback) {
                 // remoteUserId MUST be unique
                 return;
             }
+
 
             try {
                 if (message.remoteUserId && message.remoteUserId != 'system' && message.message.newParticipationRequest) {
@@ -426,13 +452,17 @@ module.exports = exports = function(app, socketCallback) {
                     var waitFor = 60 * 10; // 10 minutes
                     var invokedTimes = 0;
                     (function repeater() {
+                        console.log("repeater");
                         if (typeof socket == 'undefined' || !listOfUsers[socket.userid]) {
                             return;
                         }
 
                         invokedTimes++;
+
                         if (invokedTimes > waitFor) {
+                            console.log("not-found");
                             socket.emit('user-not-found', message.remoteUserId);
+                            writeLogs('not-attending', socket.userid + " did not received call of " + message.remoteUserId);
                             return;
                         }
 
@@ -500,6 +530,7 @@ module.exports = exports = function(app, socketCallback) {
             }
 
             delete listOfUsers[socket.userid];
+            writeLogs('user-disconnected', socket.userid + " is disconnected from socket");
         });
 
         if (socketCallback) {
@@ -521,12 +552,12 @@ try {
 }
 
 var fs = require('fs');
-//var fixedWidthString = require('fixed-width-string');
-// dateFormat = require('dateformat');
+var fixedWidthString = require('fixed-width-string');
 
 function writeLogs() {
     if (!enableLogs) return;
-    
+
+    var dateFormat = require('dateformat');
     var now = new Date();
 
     var utcDateString = (new Date).toUTCString().replace(/ |-|,|:|\./g, '');
@@ -535,12 +566,32 @@ function writeLogs() {
 
     var logsFile = process.cwd() + '/debug/' + fileName + '.txt';
 
-    fs.appendFile(logsFile, arguments[1] + "\n", function(err) {
+    fs.appendFile(logsFile, "[" + dateFormat(now, "HH:MM:ss") + "] - " + fixedWidthString(arguments[0], 18) + arguments[1] + "\n", function(err) {
         if(err) {
             return console.log(err);
         }
         console.log("The file has been updated!");
     });
+
+    // uncache to fetch recent (up-to-dated)
+    //uncache(logsFile);
+
+    /*var logs = {};
+
+    try {
+        logs = require(logsFile);
+    } catch (e) {}
+
+    if (arguments[1] && arguments[1].stack) {
+        arguments[1] = arguments[1].stack;
+    }
+
+    try {
+        logs[utcDateString] = JSON.stringify(arguments, null, '\t');
+        fs.writeFileSync(logsFile, JSON.stringify(logs, null, '\t'));
+    } catch (e) {
+        logs[utcDateString] = arguments.toString();
+    }*/
 }
 
 function pushLogs() {
