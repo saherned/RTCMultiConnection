@@ -61,6 +61,7 @@ module.exports = exports = function(app, socketCallback) {
             }
         }
 
+        if(listOfUsers[socket.handshake.query.sessionid]==undefined)
         listOfUsers[socket.userid] = {
             socket: socket,
             connectedWith: {},
