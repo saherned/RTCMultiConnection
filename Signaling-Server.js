@@ -351,7 +351,7 @@ module.exports = exports = function(app, socketCallback) {
             var maxParticipantsAllowed = roomInitiator.maxParticipantsAllowed;
 
             if (Object.keys(usersInARoom).length >= maxParticipantsAllowed) {
-                socket.emit('user-busy', message.remoteUserId  + " is busy");
+                socket.emit('room-full', message.remoteUserId);
                 writeLogs('room-full', message.remoteUserId + " is busy");
                 //writeLogs('Room Full - ' + message.remoteUserId + " is busy");
 
